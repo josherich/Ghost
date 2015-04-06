@@ -30,14 +30,18 @@ var crypto   = require('crypto'),
     api      = require('./api'),
     config   = require('./config'),
     errors   = require('./errors'),
-    packageInfo = require('../../package.json'),
 
     internal = {context: {internal: true}},
     allowedCheckEnvironments = ['development', 'production'],
     checkEndpoint = 'updates.ghost.org',
-    currentVersion = packageInfo.version;
+    currentVersion = config.ghostVersion;
 
 function updateCheckError(error) {
+    api.settings.edit(
+        {settings: [{key: 'nextUpdateCheck', value: Math.round(Date.now() / 1000 + 24 * 3600)}]},
+        internal
+    ).catch(errors.rejectError);
+
     errors.logError(
         error,
         'Checking for updates failed, your blog will continue to function.',
@@ -125,12 +129,20 @@ function updateCheckRequest() {
                 });
             });
 
-            req.write(reqData);
-            req.end();
+            req.on('socket', function (socket) {
+                // Wait a maximum of 10seconds
+                socket.setTimeout(10000);
+                socket.on('timeout', function () {
+                    req.abort();
+                });
+            });
 
             req.on('error', function (error) {
                 reject(error);
             });
+
+            req.write(reqData);
+            req.end();
         });
     });
 }
@@ -168,7 +180,8 @@ function updateCheck() {
     // 1. updateCheck is defined as false in config.js
     // 2. we've already done a check this session
     // 3. we're not in production or development mode
-    if (config.updateCheck === false || _.indexOf(allowedCheckEnvironments, process.env.NODE_ENV) === -1) {
+    // TODO: need to remove config.updateCheck in favor of config.privacy.updateCheck in future version (it is now deprecated)
+    if (config.updateCheck === false || config.isPrivacyDisabled('useUpdateCheck') || _.indexOf(allowedCheckEnvironments, process.env.NODE_ENV) === -1) {
         // No update check
         return Promise.resolve();
     } else {

@@ -11,6 +11,7 @@ var _            = require('lodash'),
     docName      = 'settings',
     settings,
 
+    updateConfigTheme,
     updateSettingsCache,
     settingsFilter,
     filterPaths,
@@ -28,12 +29,28 @@ var _            = require('lodash'),
      */
     settingsCache = {};
 
+/**
+* ### Updates Config Theme Settings
+* Maintains the cache of theme specific variables that are reliant on settings.
+* @private
+*/
+updateConfigTheme = function () {
+    config.set({
+        theme: {
+            title: (settingsCache.title && settingsCache.title.value) || '',
+            description: (settingsCache.description && settingsCache.description.value) || '',
+            logo: (settingsCache.logo && settingsCache.logo.value) || '',
+            cover: (settingsCache.cover && settingsCache.cover.value) || '',
+            navigation: (settingsCache.navigation && JSON.parse(settingsCache.navigation.value)) || []
+        }
+    });
+};
 
 /**
  * ### Update Settings Cache
  * Maintain the internal cache of the settings object
  * @public
- * @param settings
+ * @param {Object} settings
  * @returns {Settings}
  */
 updateSettingsCache = function (settings) {
@@ -44,12 +61,16 @@ updateSettingsCache = function (settings) {
             settingsCache[key] = setting;
         });
 
+        updateConfigTheme();
+
         return Promise.resolve(settingsCache);
     }
 
     return dataProvider.Settings.findAll()
         .then(function (result) {
             settingsCache = readSettingsResult(result.models);
+
+            updateConfigTheme();
 
             return settingsCache;
         });
@@ -61,8 +82,8 @@ updateSettingsCache = function (settings) {
  * ### Settings Filter
  * Filters an object based on a given filter object
  * @private
- * @param settings
- * @param filter
+ * @param {Object} settings
+ * @param {String} filter
  * @returns {*}
  */
 settingsFilter = function (settings, filter) {
@@ -97,7 +118,7 @@ filterPaths = function (paths, active) {
     }
 
     _.each(pathKeys, function (key) {
-        //do not include hidden files or _messages
+        // do not include hidden files or _messages
         if (key.indexOf('.') !== 0 &&
                 key !== '_messages' &&
                 key !== 'README.md'
@@ -120,11 +141,10 @@ filterPaths = function (paths, active) {
     return res;
 };
 
-
 /**
  * ### Read Settings Result
  * @private
- * @param settingsModels
+ * @param {Array} settingsModels
  * @returns {Settings}
  */
 readSettingsResult = function (settingsModels) {
@@ -165,8 +185,8 @@ readSettingsResult = function (settingsModels) {
 /**
  * ### Settings Result
  * @private
- * @param settings
- * @param type
+ * @param {Object} settings
+ * @param {String} type
  * @returns {{settings: *}}
  */
 settingsResult = function (settings, type) {
@@ -188,8 +208,7 @@ settingsResult = function (settings, type) {
 /**
  * ### Populate Default Setting
  * @private
- * @param key
- * @param type
+ * @param {String} key
  * @returns Promise(Setting)
  */
 populateDefaultSetting = function (key) {
@@ -200,10 +219,6 @@ populateDefaultSetting = function (key) {
 
         // Add to the settings cache
         return updateSettingsCache(readResult).then(function () {
-            // Try to update theme with the new settings
-            // if we're in the middle of populating, this might not work
-            return config.theme.update(settings, config.url).then(function () { return; }, function () { return; });
-        }).then(function () {
             // Get the result from the cache with permission checks
         });
     }).catch(function (err) {
@@ -221,7 +236,7 @@ populateDefaultSetting = function (key) {
  * ### Can Edit All Settings
  * Check that this edit request is allowed for all settings requested to be updated
  * @private
- * @param settingsInfo
+ * @param {Object} settingsInfo
  * @returns {*}
  */
 canEditAllSettings = function (settingsInfo, options) {
@@ -235,7 +250,6 @@ canEditAllSettings = function (settingsInfo, options) {
             return canThis(options.context).edit.setting(setting.key).catch(function () {
                 return Promise.reject(new errors.NoPermissionError('You do not have permission to edit settings.'));
             });
-
         },
         checks = _.map(settingsInfo, function (settingInfo) {
             var setting = settingsCache[settingInfo.key];
@@ -263,7 +277,7 @@ settings = {
 
     /**
      * ### Browse
-     * @param options
+     * @param {Object} options
      * @returns {*}
      */
     browse: function browse(options) {
@@ -297,12 +311,12 @@ settings = {
 
     /**
      * ### Read
-     * @param options
+     * @param {Object} options
      * @returns {*}
      */
     read: function read(options) {
         if (_.isString(options)) {
-            options = { key: options };
+            options = {key: options};
         }
 
         var getSettingsResult = function () {
@@ -355,10 +369,10 @@ settings = {
 
         // Allow shorthand syntax where a single key and value are passed to edit instead of object and options
         if (_.isString(object)) {
-            object = { settings: [{ key: object, value: options }]};
+            object = {settings: [{key: object, value: options}]};
         }
 
-        //clean data
+        // clean data
         _.each(object.settings, function (setting) {
             if (!_.isString(setting.value)) {
                 setting.value = JSON.stringify(setting.value);
@@ -382,8 +396,6 @@ settings = {
                 var readResult = readSettingsResult(result);
 
                 return updateSettingsCache(readResult).then(function () {
-                    return config.theme.update(settings, config.url);
-                }).then(function () {
                     return settingsResult(readResult, type);
                 });
             });

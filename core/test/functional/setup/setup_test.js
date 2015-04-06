@@ -1,7 +1,7 @@
 // # Setup Test
 // Test that setup works correctly
 
-/*global CasperTest, casper, email */
+/*global CasperTest, casper, email, user, password */
 
 CasperTest.begin('Ghost setup fails properly', 6, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('setup', function then() {
@@ -9,7 +9,7 @@ CasperTest.begin('Ghost setup fails properly', 6, function suite(test) {
     });
 
     casper.then(function setupWithShortPassword() {
-        casper.fillAndAdd('#setup', { 'blog-title': 'ghost', name: 'slimer', email: email, password: 'short' });
+        casper.fillAndAdd('#setup', {'blog-title': 'ghost', name: 'slimer', email: email, password: 'short'});
     });
 
     // should now throw a short password error
@@ -21,7 +21,7 @@ CasperTest.begin('Ghost setup fails properly', 6, function suite(test) {
     });
 
     casper.then(function setupWithLongPassword() {
-        casper.fillAndAdd('#setup', { 'blog-title': 'ghost', name: 'slimer', email: email, password: password });
+        casper.fillAndAdd('#setup', {'blog-title': 'ghost', name: 'slimer', email: email, password: password});
     });
 
     // This can take quite a long time
@@ -38,11 +38,11 @@ CasperTest.begin('Ghost setup fails properly', 6, function suite(test) {
 
 CasperTest.begin('Authenticated user is redirected', 8, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('signin', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
+        test.assertTitle('Sign In - ghost', 'Ghost admin has incorrect title');
         test.assertUrlMatch(/ghost\/signin\/$/, 'Landed on the correct URL');
     });
 
-     casper.waitForOpaque('.login-box', function then() {
+    casper.waitForOpaque('.login-box', function then() {
         this.fillAndSave('#login', user);
     });
 

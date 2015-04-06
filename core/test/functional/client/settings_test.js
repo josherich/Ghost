@@ -10,15 +10,15 @@ var generalTabDetector = '.settings-content form#settings-general',
 
 CasperTest.begin('Settings screen is correct', 15, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
+        test.assertTitle('Settings - General - Test Blog', 'Ghost admin has incorrect title');
         test.assertUrlMatch(/ghost\/settings\/general\/$/, 'Landed on the correct URL');
     });
 
     casper.then(function testViews() {
         test.assertExists('.settings', 'Settings main view is present');
-        test.assertExists('.settings-menu', 'Settings menu is present');
-        test.assertExists('.settings-menu-general a', 'General link is present');
-        test.assertExists('.settings-menu-users a', 'Users link is present');
+        test.assertExists('.settings-nav', 'Settings menu is present');
+        test.assertExists('.settings-nav-general a', 'General link is present');
+        test.assertExists('.settings-nav-users a', 'Users link is present');
         test.assertNotExists('.settings-menu-apps a', 'Apps link is present');
         test.assertExists('.settings', 'Settings main view is present');
         test.assertExists('.settings-content', 'Settings content view is present');
@@ -27,18 +27,18 @@ CasperTest.begin('Settings screen is correct', 15, function suite(test) {
     });
 
     casper.then(function testSwitchingTabs() {
-        casper.thenClick('.settings-menu-users a');
-        casper.waitForSelector(usersTabDetector, function then () {
+        casper.thenClick('.settings-nav-users a');
+        casper.waitForSelector(usersTabDetector, function then() {
             // assert that the right menu item is active
-            test.assertExists('.settings-menu-users.active a', 'Users link is active');
-            test.assertDoesntExist('.settings-menu-general.active a', 'General link is not active');
+            test.assertExists('.settings-nav-users.active a', 'Users link is active');
+            test.assertDoesntExist('.settings-nav-general.active a', 'General link is not active');
         }, casper.failOnTimeout(test, 'waitForSelector `usersTabDetector` timed out'));
 
-        casper.thenClick('.settings-menu-general a');
-        casper.waitForSelector(generalTabDetector, function then () {
+        casper.thenClick('.settings-nav-general a');
+        casper.waitForSelector(generalTabDetector, function then() {
             // assert that the right menu item is active
-            test.assertExists('.settings-menu-general.active a', 'General link is active');
-            test.assertDoesntExist('.settings-menu-users.active a', 'User link is not active');
+            test.assertExists('.settings-nav-general.active a', 'General link is active');
+            test.assertDoesntExist('.settings-nav-users.active a', 'User link is not active');
         }, casper.failOnTimeout(test, 'waitForSelector `generalTabDetector` timed out'));
     });
 });
@@ -46,13 +46,13 @@ CasperTest.begin('Settings screen is correct', 15, function suite(test) {
 // ## General settings tests
 CasperTest.begin('General settings pane is correct', 8, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings.general', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
+        test.assertTitle('Settings - General - Test Blog', 'Ghost admin has incorrect title');
         test.assertUrlMatch(/ghost\/settings\/general\/$/, 'Landed on the correct URL');
     });
 
     function assertImageUploaderModalThenClose() {
         test.assertSelectorHasText('.description', 'Add image');
-        casper.click('#modal-container .js-button-accept');
+        casper.click('.modal-container .js-button-accept');
         casper.waitForSelector('.notification-success', function onSuccess() {
             test.assert(true, 'Got success notification');
         }, casper.failOnTimeout(test, 'No success notification'));
@@ -65,7 +65,7 @@ CasperTest.begin('General settings pane is correct', 8, function suite(test) {
         casper.click('.js-modal-logo');
     });
 
-    casper.waitForSelector('#modal-container .modal-content .js-drop-zone .description',
+    casper.waitForSelector('.modal-container .modal-content .js-drop-zone .description',
         assertImageUploaderModalThenClose, casper.failOnTimeout(test, 'No upload logo modal container appeared'));
 
     // Test Blog Cover Upload Button
@@ -73,7 +73,7 @@ CasperTest.begin('General settings pane is correct', 8, function suite(test) {
         casper.click('.js-modal-cover');
     });
 
-    casper.waitForSelector('#modal-container .modal-content .js-drop-zone .description',
+    casper.waitForSelector('.modal-container .modal-content .js-drop-zone .description',
         assertImageUploaderModalThenClose, casper.failOnTimeout(test, 'No upload cover modal container appeared'));
 
     function handleSettingsRequest(requestData) {
@@ -107,10 +107,10 @@ CasperTest.begin('General settings pane is correct', 8, function suite(test) {
     }, casper.failOnTimeout(test, 'No success notification :('));
 });
 
-//// ## General settings validations tests
+// ## General settings validations tests
 CasperTest.begin('General settings validation is correct', 6, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings.general', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
+        test.assertTitle('Settings - General - Test Blog', 'Ghost admin has incorrect title');
         test.assertUrlMatch(/ghost\/settings\/general\/$/, 'Landed on the correct URL');
     });
 
@@ -136,7 +136,7 @@ CasperTest.begin('General settings validation is correct', 6, function suite(tes
 
     casper.thenClick('.js-bb-notification .close');
 
-    // Check postsPerPage autocorrect   
+    // Check postsPerPage autocorrect
     casper.fillAndSave('form#settings-general', {
         'general[postsPerPage]': 'notaninteger'
     });
@@ -156,15 +156,15 @@ CasperTest.begin('General settings validation is correct', 6, function suite(tes
 
 CasperTest.begin('Users screen is correct', 9, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings.general');
-    casper.thenTransitionAndWaitForScreenLoad('settings.users', function canTransition () {
+    casper.thenTransitionAndWaitForScreenLoad('settings.users', function canTransition() {
         test.assert(true, 'Can transition to users screen from settings.general');
         test.assertUrlMatch(/ghost\/settings\/users\/$/, 'settings.users transitions to correct url');
     });
     casper.then(function usersScreenHasContent() {
-        test.assertSelectorHasText('.settings-users .object-list .object-list-title', 'Active users');
-        test.assertExists('.settings-users .object-list .object-list-item', 'Has an active user');
-        test.assertSelectorHasText('.settings-users .object-list-item .name', 'Test User');
-        test.assertExists('.settings-users .object-list-item .role-label.owner', 'First user has owner role displayed');
+        test.assertSelectorHasText('.settings-users .user-list .user-list-title', 'Active users');
+        test.assertExists('.settings-users .user-list .user-list-item', 'Has an active user');
+        test.assertSelectorHasText('.settings-users .user-list-item .name', 'Test User');
+        test.assertExists('.settings-users .user-list-item .role-label.owner', 'First user has owner role displayed');
 
         test.assertExists('.page-actions .btn-green', 'Add user button is on page.');
     });
@@ -173,22 +173,22 @@ CasperTest.begin('Users screen is correct', 9, function suite(test) {
         test.assertEval(function testOwnerRoleNotAnOption() {
             var options = document.querySelectorAll('.invite-new-user select#new-user-role option'),
                 i = 0;
-            for (; i < options.length; i++) {
-                if (options[i].text === "Owner") {
+            for (; i < options.length; i = i + 1) {
+                if (options[i].text === 'Owner') {
                     return false;
                 }
             }
             return true;
         }, '"Owner" is not a role option for new users');
     });
-    //role options get loaded asynchronously; give them a chance to come in
+    // role options get loaded asynchronously; give them a chance to come in
     casper.waitForSelector('.invite-new-user select#new-user-role option', function then() {
         test.assertEval(function authorIsSelectedByDefault() {
             var options = document.querySelectorAll('.invite-new-user select#new-user-role option'),
                 i = 0;
-            for (; i < options.length; i++) {
+            for (; i < options.length; i = i + 1) {
                 if (options[i].selected) {
-                    return options[i].text === "Author"
+                    return options[i].text === 'Author';
                 }
             }
             return false;
@@ -198,8 +198,8 @@ CasperTest.begin('Users screen is correct', 9, function suite(test) {
 // ### User settings tests
 CasperTest.begin('Can save settings', 7, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost Admin title is GhostAdmin');
-        test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'settings.users.user has correct URL');
+        test.assertTitle('Settings - User - Test Blog', 'Ghost Admin title is correct');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'settings.users.user has correct URL');
     });
 
     function handleUserRequest(requestData) {
@@ -237,35 +237,35 @@ CasperTest.begin('Can save settings', 7, function suite(test) {
         test.assert(true, 'Got success notification');
     }, casper.failOnTimeout(test, 'No success notification :('));
 
-    casper.thenClick('.settings-menu-general a').then(function testTransitionToGeneral() {
+    casper.thenClick('.settings-nav-general a').then(function testTransitionToGeneral() {
         casper.waitForSelector(generalTabDetector, function then() {
             casper.on('resource.requested', handleSettingsRequest);
             test.assertEval(function testGeneralIsActive() {
-                return document.querySelector('.settings-menu-general').classList.contains('active');
+                return document.querySelector('.settings-nav-general').classList.contains('active');
             }, 'general tab is marked active');
         },
         casper.failOnTimeout(test, 'waitForSelector `usersTabDetector` timed out'));
     });
 
     casper.thenClick('.btn-blue').waitFor(function successNotification() {
-       return this.evaluate(function () {
-           return document.querySelectorAll('.js-bb-notification section').length > 0;
-       });
+        return this.evaluate(function () {
+            return document.querySelectorAll('.js-bb-notification section').length > 0;
+        });
     }, function doneWaiting() {
-       test.pass('Waited for notification');
-    },  casper.failOnTimeout(test, 'Saving the general pane did not result in a notification'));
+        test.pass('Waited for notification');
+    }, casper.failOnTimeout(test, 'Saving the general pane did not result in a notification'));
 
     casper.then(function checkSettingsWereSaved() {
-       casper.removeListener('resource.requested', handleSettingsRequest);
+        casper.removeListener('resource.requested', handleSettingsRequest);
     });
 
     casper.waitForSelector('.notification-success', function onSuccess() {
-       test.assert(true, 'Got success notification');
+        test.assert(true, 'Got success notification');
     }, casper.failOnTimeout(test, 'No success notification :('));
 
     CasperTest.beforeDone(function () {
-       casper.removeListener('resource.requested', handleUserRequest);
-       casper.removeListener('resource.requested', handleSettingsRequest);
+        casper.removeListener('resource.requested', handleUserRequest);
+        casper.removeListener('resource.requested', handleSettingsRequest);
     });
 });
 
@@ -273,13 +273,17 @@ CasperTest.begin('User settings screen resets all whitespace slug to original va
     var slug;
 
     casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-        test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
     });
 
-    casper.then(function setSlugToAllWhitespace() {
-        slug = casper.getElementInfo('#user-slug').attributes.value;
+    casper.then(function getSlugValue() {
+        slug = this.evaluate(function () {
+            return document.querySelector('#user-slug').value;
+        });
+    });
 
+    casper.then(function changeSlugInput() {
         casper.fillSelectors('.user-profile', {
             '#user-slug': '   '
         }, false);
@@ -297,13 +301,17 @@ CasperTest.begin('User settings screen change slug handles duplicate slug', 4, f
     var slug;
 
     casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-        test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
+    });
+
+    casper.then(function getSlugValue() {
+        slug = this.evaluate(function () {
+            return document.querySelector('#user-slug').value;
+        });
     });
 
     casper.then(function changeSlug() {
-        slug = casper.getElementInfo('#user-slug').attributes.value;
-
         casper.fillSelectors('.user-profile', {
             '#user-slug': slug + '!'
         }, false);
@@ -312,7 +320,7 @@ CasperTest.begin('User settings screen change slug handles duplicate slug', 4, f
     casper.thenClick('body');
 
     casper.waitForResource(/\/slugs\/user\//, function testGoodResponse(resource) {
-        test.assert(400 > resource.status);
+        test.assert(resource.status < 400);
     });
 
     casper.then(function checkSlugInputValue() {
@@ -321,16 +329,21 @@ CasperTest.begin('User settings screen change slug handles duplicate slug', 4, f
 });
 
 CasperTest.begin('User settings screen validates email', 6, function suite(test) {
-    var email, brokenEmail;
+    var email;
 
     casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-        test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
+    });
+
+    casper.then(function getEmail() {
+        email = this.evaluate(function () {
+            return document.querySelector('#user-email').value;
+        });
     });
 
     casper.then(function setEmailToInvalid() {
-        email = casper.getElementInfo('#user-email').attributes.value;
-        brokenEmail = email.replace('.', '-');
+        var brokenEmail = email.replace('.', '-');
 
         casper.fillSelectors('.user-profile', {
             '#user-email': brokenEmail
@@ -365,8 +378,8 @@ CasperTest.begin('User settings screen validates email', 6, function suite(test)
 // TODO: user needs to be loaded whenever it is edited (multi user)
 CasperTest.begin('User settings screen shows remaining characters for Bio properly', 4, function suite(test) {
     casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-        test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-        test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
     });
 
     function getRemainingBioCharacterCount() {
@@ -389,58 +402,58 @@ CasperTest.begin('User settings screen shows remaining characters for Bio proper
 });
 
 CasperTest.begin('Ensure user bio field length validation', 3, function suite(test) {
-   casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-       test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-       test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
-   });
+    casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
+    });
 
-   casper.then(function setBioToInvalid() {
-       this.fillSelectors('form.user-profile', {
-           '#user-bio': new Array(202).join('a')
-       });
-   });
+    casper.then(function setBioToInvalid() {
+        this.fillSelectors('form.user-profile', {
+            '#user-bio': new Array(202).join('a')
+        });
+    });
 
-   casper.thenClick('.page-actions .btn-blue');
+    casper.thenClick('.page-actions .btn-blue');
 
-   casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
-       test.assertSelectorHasText('.notification-error', 'is too long');
-   }, casper.failOnTimeout(test, 'Bio field length error did not appear', 2000));
+    casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
+        test.assertSelectorHasText('.notification-error', 'is too long');
+    }, casper.failOnTimeout(test, 'Bio field length error did not appear', 2000));
 });
 
 CasperTest.begin('Ensure user url field validation', 3, function suite(test) {
-   casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-       test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-       test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
-   });
+    casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
+    });
 
     casper.then(function setWebsiteToInvalid() {
-       this.fillSelectors('form.user-profile', {
-           '#user-website': 'notaurl'
-       });
-   });
+        this.fillSelectors('form.user-profile', {
+            '#user-website': 'notaurl'
+        });
+    });
 
-   casper.thenClick('.page-actions .btn-blue');
+    casper.thenClick('.page-actions .btn-blue');
 
-   casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
-       test.assertSelectorHasText('.notification-error', 'not a valid url');
-   }, casper.failOnTimeout(test, 'Url validation error did not appear', 2000));
+    casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
+        test.assertSelectorHasText('.notification-error', 'not a valid url');
+    }, casper.failOnTimeout(test, 'Url validation error did not appear', 2000));
 });
 
 CasperTest.begin('Ensure user location field length validation', 3, function suite(test) {
-   casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
-       test.assertTitle('Ghost Admin', 'Ghost admin has no title');
-       test.assertUrlMatch(/ghost\/settings\/users\/test-user\/$/, 'Ghost doesn\'t require login this time');
-   });
+    casper.thenOpenAndWaitForPageLoad('settings.users.user', function testTitleAndUrl() {
+        test.assertTitle('Settings - User - Test Blog', 'Ghost admin has incorrect title');
+        test.assertUrlMatch(/ghost\/settings\/users\/test\/$/, 'Ghost doesn\'t require login this time');
+    });
 
-   casper.then(function setLocationToInvalid() {
-       this.fillSelectors('form.user-profile', {
-           '#user-location': new Array(1002).join('a')
-       });
-   });
+    casper.then(function setLocationToInvalid() {
+        this.fillSelectors('form.user-profile', {
+            '#user-location': new Array(1002).join('a')
+        });
+    });
 
-   casper.thenClick('.page-actions .btn-blue');
+    casper.thenClick('.page-actions .btn-blue');
 
-   casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
-       test.assertSelectorHasText('.notification-error', 'is too long');
-   }, casper.failOnTimeout(test, 'Location field length error did not appear', 2000));
+    casper.waitForSelectorTextChange('.notification-error', function onSuccess() {
+        test.assertSelectorHasText('.notification-error', 'is too long');
+    }, casper.failOnTimeout(test, 'Location field length error did not appear', 2000));
 });

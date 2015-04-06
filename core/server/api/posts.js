@@ -8,13 +8,14 @@ var Promise         = require('bluebird'),
     utils           = require('./utils'),
 
     docName         = 'posts',
-    allowedIncludes = ['created_by', 'updated_by', 'published_by', 'author', 'tags', 'fields'],
+    allowedIncludes = ['created_by', 'updated_by', 'published_by', 'author', 'tags', 'fields', 'next', 'previous'],
     posts;
 
 // ## Helpers
 function prepareInclude(include) {
     var index;
 
+    include = include || '';
     include = _.intersection(include.split(','), allowedIncludes);
     index = include.indexOf('author');
 
@@ -85,7 +86,7 @@ posts = {
 
         return dataProvider.Post.findOne(data, options).then(function (result) {
             if (result) {
-                return { posts: [ result.toJSON() ]};
+                return {posts: [result.toJSON()]};
             }
 
             return Promise.reject(new errors.NotFoundError('Post not found.'));
@@ -103,7 +104,7 @@ posts = {
      */
     edit: function edit(object, options) {
         return canThis(options.context).edit.post(options.id).then(function () {
-            return utils.checkObject(object, docName).then(function (checkedPostData) {
+            return utils.checkObject(object, docName, options.id).then(function (checkedPostData) {
                 if (options.include) {
                     options.include = prepareInclude(options.include);
                 }
@@ -118,7 +119,7 @@ posts = {
                     if (result.updated('status') !== result.get('status')) {
                         post.statusChanged = true;
                     }
-                    return { posts: [ post ]};
+                    return {posts: [post]};
                 }
 
                 return Promise.reject(new errors.NotFoundError('Post not found.'));
@@ -154,13 +155,12 @@ posts = {
                     // When creating a new post that is published right now, signal the change
                     post.statusChanged = true;
                 }
-                return { posts: [ post ]};
+                return {posts: [post]};
             });
         }, function () {
             return Promise.reject(new errors.NoPermissionError('You do not have permission to add posts.'));
         });
     },
-
 
     /**
      * ### Destroy

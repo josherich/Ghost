@@ -1,4 +1,4 @@
-/*globals describe, it, before, beforeEach, afterEach */
+/*globals describe, it, before, beforeEach, afterEach, after */
 /*jshint expr:true*/
 var should         = require('should'),
     sinon          = require('sinon'),
@@ -12,51 +12,49 @@ var should         = require('should'),
 
     // Thing we are testing
     defaultConfig  = require('../../../config.example')[process.env.NODE_ENV],
-    theme          = rewire('../../server/config/theme'),
-    config         = rewire('../../server/config');
+    config         = require('../../server/config'),
+    origConfig     = _.cloneDeep(config),
+    // storing current environment
+    currentEnv     = process.env.NODE_ENV;
 
 // To stop jshint complaining
 should.equal(true, true);
 
+function resetConfig() {
+    config.set(_.merge({}, origConfig, defaultConfig));
+}
+
 describe('Config', function () {
+    after(function () {
+        resetConfig();
+    });
 
     describe('Theme', function () {
-
-        var sandbox,
-            settings,
-            settingsStub;
-
-        beforeEach(function (done) {
-            sandbox = sinon.sandbox.create();
-
-            settings = {'read': function read() {}};
-
-            settingsStub = sandbox.stub(settings, 'read', function () {
-                return Promise.resolve({ settings: [{value: 'casper'}] });
+        beforeEach(function () {
+            config.set({
+                url: 'http://my-ghost-blog.com',
+                theme: {
+                    title: 'casper',
+                    description: 'casper',
+                    logo: 'casper',
+                    cover: 'casper'
+                }
             });
-
-            theme.update(settings, 'http://my-ghost-blog.com')
-                .then(done)
-                .catch(done);
         });
 
-        afterEach(function (done) {
-            theme.update(settings, defaultConfig.url)
-                .then(done)
-                .catch(done);
-
-            sandbox.restore();
+        afterEach(function () {
+            resetConfig();
         });
 
         it('should have exactly the right keys', function () {
-            var themeConfig = theme();
+            var themeConfig = config.theme;
 
             // This will fail if there are any extra keys
             themeConfig.should.have.keys('url', 'title', 'description', 'logo', 'cover');
         });
 
         it('should have the correct values for each key', function () {
-            var themeConfig = theme();
+            var themeConfig = config.theme;
 
             // Check values are as we expect
             themeConfig.should.have.property('url', 'http://my-ghost-blog.com');
@@ -64,19 +62,15 @@ describe('Config', function () {
             themeConfig.should.have.property('description', 'casper');
             themeConfig.should.have.property('logo', 'casper');
             themeConfig.should.have.property('cover', 'casper');
-
-            // Check settings.read gets called exactly 4 times
-            settingsStub.callCount.should.equal(4);
         });
     });
 
     describe('Index', function () {
-
         afterEach(function () {
             // Make a copy of the default config file
             // so we can restore it after every test.
             // Using _.merge to recursively apply every property.
-            config.set(_.merge({}, config));
+            resetConfig();
         });
 
         it('should have exactly the right keys', function () {
@@ -88,6 +82,7 @@ describe('Config', function () {
                 'subdir',
                 'config',
                 'configExample',
+                'storage',
                 'contentPath',
                 'corePath',
                 'themePath',
@@ -98,10 +93,9 @@ describe('Config', function () {
                 'helperTemplates',
                 'exportPath',
                 'lang',
-                'debugPath',
                 'availableThemes',
                 'availableApps',
-                'builtScriptPath'
+                'clientAssets'
             );
         });
 
@@ -154,14 +148,41 @@ describe('Config', function () {
         });
     });
 
-    describe('urlFor', function () {
+    describe('Storage', function () {
+        afterEach(function () {
+            resetConfig();
+        });
 
+        it('should default to local-file-store', function () {
+            var storagePath = path.join(config.paths.corePath, '/server/storage/', 'local-file-store');
+
+            config.paths.should.have.property('storage', storagePath);
+            config.storage.should.have.property('active', 'local-file-store');
+        });
+
+        it('should allow setting a custom active storage', function () {
+            var storagePath = path.join(config.paths.contentPath, 'storage', 's3');
+
+            config.set({
+                storage: {
+                    active: 's3',
+                    s3: {}
+                }
+            });
+
+            config.paths.should.have.property('storage', storagePath);
+            config.storage.should.have.property('active', 's3');
+            config.storage.should.have.property('s3', {});
+        });
+    });
+
+    describe('urlFor', function () {
         before(function () {
-            config.set(_.merge({}, defaultConfig));
+            resetConfig();
         });
 
         afterEach(function () {
-            config.set({url: defaultConfig.url});
+            resetConfig();
         });
 
         it('should return the home url with no options', function () {
@@ -206,10 +227,12 @@ describe('Config', function () {
             config.urlFor(testContext, true).should.equal('http://my-ghost-blog.com/blog/about/');
         });
 
-        it('should return url for a post when asked for', function () {
+        it('should return url for a post from post object', function () {
             var testContext = 'post',
-                testData = {post: testUtils.DataGenerator.Content.posts[2], permalinks: {value: '/:slug/'}};
+                testData = {post: testUtils.DataGenerator.Content.posts[2]};
 
+            // url is now provided on the postmodel, permalinkSetting tests are in the model_post_spec.js test
+            testData.post.url = '/short-and-sweet/';
             config.set({url: 'http://my-ghost-blog.com'});
             config.urlFor(testContext, testData).should.equal('/short-and-sweet/');
             config.urlFor(testContext, testData, true).should.equal('http://my-ghost-blog.com/short-and-sweet/');
@@ -217,27 +240,6 @@ describe('Config', function () {
             config.set({url: 'http://my-ghost-blog.com/blog'});
             config.urlFor(testContext, testData).should.equal('/blog/short-and-sweet/');
             config.urlFor(testContext, testData, true).should.equal('http://my-ghost-blog.com/blog/short-and-sweet/');
-        });
-
-        it('should return url for a dated post when asked for', function () {
-            var testContext = 'post',
-                testData = {
-                    post: testUtils.DataGenerator.Content.posts[2],
-                    permalinks: {value: '/:year/:month/:day/:slug/'}
-                },
-                today = new Date(),
-                dd = ('0' + today.getDate()).slice(-2),
-                mm = ('0' + (today.getMonth() + 1)).slice(-2),
-                yyyy = today.getFullYear(),
-                postLink = '/' + yyyy + '/' + mm + '/' + dd + '/short-and-sweet/';
-
-            config.set({url: 'http://my-ghost-blog.com'});
-            config.urlFor(testContext, testData).should.equal(postLink);
-            config.urlFor(testContext, testData, true).should.equal('http://my-ghost-blog.com' + postLink);
-
-            config.set({url: 'http://my-ghost-blog.com/blog'});
-            config.urlFor(testContext, testData).should.equal('/blog' + postLink);
-            config.urlFor(testContext, testData, true).should.equal('http://my-ghost-blog.com/blog' + postLink);
         });
 
         it('should return url for a tag when asked for', function () {
@@ -253,134 +255,58 @@ describe('Config', function () {
             config.urlFor(testContext, testData, true).should.equal('http://my-ghost-blog.com/blog/tag/kitchen-sink/');
         });
 
+        it('should return a url for a nav item when asked for it', function () {
+            var testContext = 'nav',
+                testData;
+
+            config.set({url: 'http://my-ghost-blog.com', urlSSL: 'https://my-ghost-blog.com'});
+
+            testData = {nav: {url: 'http://my-ghost-blog.com/short-and-sweet/'}};
+            config.urlFor(testContext, testData).should.equal('http://my-ghost-blog.com/short-and-sweet/');
+
+            testData = {nav: {url: 'http://my-ghost-blog.com/short-and-sweet/'}, secure: true};
+            config.urlFor(testContext, testData).should.equal('https://my-ghost-blog.com/short-and-sweet/');
+
+            testData = {nav: {url: 'http://sub.my-ghost-blog.com/'}};
+            config.urlFor(testContext, testData).should.equal('http://sub.my-ghost-blog.com/');
+
+            config.set({url: 'http://my-ghost-blog.com/blog'});
+            testData = {nav: {url: 'http://my-ghost-blog.com/blog/short-and-sweet/'}};
+            config.urlFor(testContext, testData).should.equal('http://my-ghost-blog.com/blog/short-and-sweet/');
+        });
     });
 
-    describe('urlForPost', function () {
-        var sandbox;
-
-        beforeEach(function () {
-            sandbox = sinon.sandbox.create();
-        });
-
-        afterEach(function () {
-            sandbox.restore();
-            config.set({url: defaultConfig.url});
-        });
-
-        it('should output correct url for post', function (done) {
-            var settings = {'read': function read() {}},
-                settingsStub = sandbox.stub(settings, 'read', function () {
-                    return Promise.resolve({ settings: [{value: '/:slug/'}] });
-                }),
+    describe('urlPathForPost', function () {
+        it('should output correct url for post', function () {
+            var permalinkSetting = '/:slug/',
                 /*jshint unused:false*/
                 testData = testUtils.DataGenerator.Content.posts[2],
                 postLink = '/short-and-sweet/';
 
-            config.set({url: 'http://my-ghost-blog.com'});
-
             // next test
-            config.urlForPost(settings, testData).then(function (url) {
-                url.should.equal(postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com' + postLink);
-
-                return config.set({url: 'http://my-ghost-blog.com/blog'});
-            }).then(function () {
-
-                // next test
-                return config.urlForPost(settings, testData);
-            }).then(function (url) {
-                url.should.equal('/blog' + postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com/blog' + postLink);
-
-                done();
-            }).catch(done);
-
+            config.urlPathForPost(testData, permalinkSetting).should.equal(postLink);
         });
 
-        it('should output correct url for post with date permalink', function (done) {
-            var settings = {'read': function read() {}},
-                settingsStub = sandbox.stub(settings, 'read', function () {
-                    return Promise.resolve({ settings: [{value: '/:year/:month/:day/:slug/'}] });
-                }),
+        it('should output correct url for post with date permalink', function () {
+            var permalinkSetting = '/:year/:month/:day/:slug/',
                 /*jshint unused:false*/
                 testData = testUtils.DataGenerator.Content.posts[2],
-                today = new Date(),
+                today = testData.published_at,
                 dd = ('0' + today.getDate()).slice(-2),
                 mm = ('0' + (today.getMonth() + 1)).slice(-2),
                 yyyy = today.getFullYear(),
                 postLink = '/' + yyyy + '/' + mm + '/' + dd + '/short-and-sweet/';
-
-            config.set({url: 'http://my-ghost-blog.com'});
-
             // next test
-            config.urlForPost(settings, testData).then(function (url) {
-                url.should.equal(postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com' + postLink);
-
-                return config.set({url: 'http://my-ghost-blog.com/blog'});
-            }).then(function () {
-
-                // next test
-                return config.urlForPost(settings, testData);
-            }).then(function (url) {
-                url.should.equal('/blog' + postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com/blog' + postLink);
-
-                done();
-            }).catch(done);
+            config.urlPathForPost(testData, permalinkSetting).should.equal(postLink);
         });
 
-        it('should output correct url for page with date permalink', function (done) {
-            var settings = {'read': function read() {}},
-                settingsStub = sandbox.stub(settings, 'read', function () {
-                    return Promise.resolve({ settings: [{value: '/:year/:month/:day/:slug/'}] });
-                }),
+        it('should output correct url for page with date permalink', function () {
+            var permalinkSetting = '/:year/:month/:day/:slug/',
                 /*jshint unused:false*/
                 testData = testUtils.DataGenerator.Content.posts[5],
                 postLink = '/static-page-test/';
-
-            config.set({url: 'http://my-ghost-blog.com'});
-
             // next test
-            config.urlForPost(settings, testData).then(function (url) {
-                url.should.equal(postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com' + postLink);
-
-                return config.set({url: 'http://my-ghost-blog.com/blog'});
-            }).then(function () {
-
-                // next test
-                return config.urlForPost(settings, testData);
-            }).then(function (url) {
-                url.should.equal('/blog' + postLink);
-
-                // next test
-                return config.urlForPost(settings, testData, true);
-            }).then(function (url) {
-                url.should.equal('http://my-ghost-blog.com/blog' + postLink);
-
-                done();
-            }).catch(done);
+            config.urlPathForPost(testData, permalinkSetting).should.equal(postLink);
         });
     });
 
@@ -406,6 +332,7 @@ describe('Config', function () {
 
         afterEach(function () {
             config = rewire('../../server/config');
+            resetConfig();
             sandbox.restore();
         });
 
@@ -450,7 +377,7 @@ describe('Config', function () {
 
         it('creates the config file if one does not exist', function (done) {
                 // trick bootstrap into thinking that the config file doesn't exist yet
-            var existsStub = sandbox.stub(fs, 'exists', function (file, cb) { return cb(false); }),
+            var existsStub = sandbox.stub(fs, 'stat', function (file, cb) { return cb(true); }),
                 // ensure that the file creation is a stub, the tests shouldn't really create a file
                 writeFileStub = sandbox.stub(config, 'writeFile').returns(Promise.resolve()),
                 validateStub = sandbox.stub(config, 'validate').returns(Promise.resolve());
@@ -493,8 +420,7 @@ describe('Config', function () {
         });
 
         it('rejects a fqdn without a scheme', function (done) {
-
-            overrideConfig({ url: 'example.com' });
+            overrideConfig({url: 'example.com'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -507,8 +433,7 @@ describe('Config', function () {
         });
 
         it('rejects a hostname without a scheme', function (done) {
-
-            overrideConfig({ url: 'example' });
+            overrideConfig({url: 'example'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -521,8 +446,7 @@ describe('Config', function () {
         });
 
         it('rejects a hostname with a scheme', function (done) {
-
-            overrideConfig({ url: 'https://example' });
+            overrideConfig({url: 'https://example'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -535,8 +459,7 @@ describe('Config', function () {
         });
 
         it('rejects a url with an unsupported scheme', function (done) {
-
-            overrideConfig({ url: 'ftp://example.com' });
+            overrideConfig({url: 'ftp://example.com'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -549,8 +472,7 @@ describe('Config', function () {
         });
 
         it('rejects a url with a protocol relative scheme', function (done) {
-
-            overrideConfig({ url: '//example.com' });
+            overrideConfig({url: '//example.com'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -563,7 +485,7 @@ describe('Config', function () {
         });
 
         it('does not permit the word ghost as a url path', function (done) {
-            overrideConfig({ url: 'http://example.com/ghost/' });
+            overrideConfig({url: 'http://example.com/ghost/'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -576,7 +498,7 @@ describe('Config', function () {
         });
 
         it('does not permit the word ghost to be a component in a url path', function (done) {
-            overrideConfig({ url: 'http://example.com/blog/ghost/' });
+            overrideConfig({url: 'http://example.com/blog/ghost/'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -589,7 +511,7 @@ describe('Config', function () {
         });
 
         it('does not permit the word ghost to be a component in a url path', function (done) {
-            overrideConfig({ url: 'http://example.com/ghost/blog/' });
+            overrideConfig({url: 'http://example.com/ghost/blog/'});
 
             config.load().then(function () {
                 done(expectedError);
@@ -603,7 +525,7 @@ describe('Config', function () {
 
         it('does not permit database config to be falsy', function (done) {
             // replace the config file with invalid data
-            overrideConfig({ database: false });
+            overrideConfig({database: false});
 
             config.load().then(function () {
                 done(expectedError);
@@ -617,7 +539,7 @@ describe('Config', function () {
 
         it('does not permit database config to be empty', function (done) {
             // replace the config file with invalid data
-            overrideConfig({ database: {} });
+            overrideConfig({database: {}});
 
             config.load().then(function () {
                 done(expectedError);
@@ -629,9 +551,8 @@ describe('Config', function () {
             }).catch(done);
         });
 
-
         it('requires server to be present', function (done) {
-            overrideConfig({ server: false });
+            overrideConfig({server: false});
 
             config.load().then(function (localConfig) {
                 /*jshint unused:false*/
@@ -645,18 +566,42 @@ describe('Config', function () {
         });
 
         it('allows server to use a socket', function (done) {
-            overrideConfig({ server: { socket: 'test' } });
+            overrideConfig({server: {socket: 'test'}});
 
-            config.load().then(function (localConfig) {
-                should.exist(localConfig);
-                localConfig.server.socket.should.equal('test');
+            config.load().then(function () {
+                var socketConfig = config.getSocket();
+
+                socketConfig.should.be.an.Object;
+                socketConfig.path.should.equal('test');
+                socketConfig.permissions.should.equal('660');
+
+                done();
+            }).catch(done);
+        });
+
+        it('allows server to use a socket and user-defined permissions', function (done) {
+            overrideConfig({
+                server: {
+                    socket: {
+                        path: 'test',
+                        permissions: '666'
+                    }
+                }
+            });
+
+            config.load().then(function () {
+                var socketConfig = config.getSocket();
+
+                socketConfig.should.be.an.Object;
+                socketConfig.path.should.equal('test');
+                socketConfig.permissions.should.equal('666');
 
                 done();
             }).catch(done);
         });
 
         it('allows server to have a host and a port', function (done) {
-            overrideConfig({ server: { host: '127.0.0.1', port: '2368' } });
+            overrideConfig({server: {host: '127.0.0.1', port: '2368'}});
 
             config.load().then(function (localConfig) {
                 should.exist(localConfig);
@@ -668,7 +613,7 @@ describe('Config', function () {
         });
 
         it('rejects server if there is a host but no port', function (done) {
-            overrideConfig({ server: { host: '127.0.0.1' } });
+            overrideConfig({server: {host: '127.0.0.1'}});
 
             config.load().then(function () {
                 done(expectedError);
@@ -681,7 +626,7 @@ describe('Config', function () {
         });
 
         it('rejects server if there is a port but no host', function (done) {
-            overrideConfig({ server: { port: '2368' } });
+            overrideConfig({server: {port: '2368'}});
 
             config.load().then(function () {
                 done(expectedError);
@@ -694,7 +639,7 @@ describe('Config', function () {
         });
 
         it('rejects server if configuration is empty', function (done) {
-            overrideConfig({ server: {} });
+            overrideConfig({server: {}});
 
             config.load().then(function () {
                 done(expectedError);
@@ -704,6 +649,132 @@ describe('Config', function () {
 
                 done();
             }).catch(done);
+        });
+    });
+
+    describe('Check for deprecation messages:', function () {
+        var logStub,
+            // Can't use afterEach here, because mocha uses console.log to output the checkboxes
+            // which we've just stubbed, so we need to restore it before the test ends to see ticks.
+            resetEnvironment = function () {
+                logStub.restore();
+                process.env.NODE_ENV = currentEnv;
+            };
+
+        beforeEach(function () {
+            logStub = sinon.stub(console, 'log');
+            process.env.NODE_ENV = 'development';
+        });
+
+        afterEach(function () {
+            logStub.restore();
+            config = rewire('../../server/config');
+        });
+
+        it('doesn\'t display warning when deprecated options not set', function () {
+            config.checkDeprecated();
+            logStub.calledOnce.should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('displays warning when updateCheck exists and is truthy', function () {
+            config.set({
+                updateCheck: 'foo'
+            });
+            // Run the test code
+            config.checkDeprecated();
+
+            logStub.calledOnce.should.be.true;
+
+            logStub.calledWithMatch(null, 'updateCheck').should.be.false;
+            logStub.calledWithMatch('', 'updateCheck').should.be.true;
+            logStub.calledWithMatch(sinon.match.string, 'updateCheck').should.be.true;
+            logStub.calledWithMatch(sinon.match.number, 'updateCheck').should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('displays warning when updateCheck exists and is falsy', function () {
+            config.set({
+                updateCheck: undefined
+            });
+            // Run the test code
+            config.checkDeprecated();
+
+            logStub.calledOnce.should.be.true;
+
+            logStub.calledWithMatch(null, 'updateCheck').should.be.false;
+            logStub.calledWithMatch('', 'updateCheck').should.be.true;
+            logStub.calledWithMatch(sinon.match.string, 'updateCheck').should.be.true;
+            logStub.calledWithMatch(sinon.match.number, 'updateCheck').should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('displays warning when mail.fromaddress exists and is truthy', function () {
+            config.set({
+                mail: {
+                    fromaddress: 'foo'
+                }
+            });
+            // Run the test code
+            config.checkDeprecated();
+
+            logStub.calledOnce.should.be.true;
+
+            logStub.calledWithMatch(null, 'mail.fromaddress').should.be.false;
+            logStub.calledWithMatch('', 'mail.fromaddress').should.be.true;
+            logStub.calledWithMatch(sinon.match.string, 'mail.fromaddress').should.be.true;
+            logStub.calledWithMatch(sinon.match.number, 'mail.fromaddress').should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('displays warning when mail.fromaddress exists and is falsy', function () {
+            config.set({
+                mail: {
+                    fromaddress: undefined
+                }
+            });
+            // Run the test code
+            config.checkDeprecated();
+
+            logStub.calledOnce.should.be.true;
+            logStub.calledWithMatch(null, 'mail.fromaddress').should.be.false;
+            logStub.calledWithMatch('', 'mail.fromaddress').should.be.true;
+            logStub.calledWithMatch(sinon.match.string, 'mail.fromaddress').should.be.true;
+            logStub.calledWithMatch(sinon.match.number, 'mail.fromaddress').should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('doesn\'t display warning when only part of a deprecated option is set', function () {
+            config.set({
+                mail: {
+                    notfromaddress: 'foo'
+                }
+            });
+
+            config.checkDeprecated();
+            logStub.calledOnce.should.be.false;
+
+            // Future tests: This is important here!
+            resetEnvironment();
+        });
+
+        it('can not modify the deprecatedItems on the config object', function () {
+            config.set({
+                deprecatedItems: ['foo']
+            });
+
+            config.deprecatedItems.should.not.equal(['foo']);
+            resetEnvironment();
         });
     });
 });
